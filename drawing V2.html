@@ -1,0 +1,508 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>9028 — Textures</title>
+<style>
+  :root{--bg:#f3f4f6;--panel:#fff;--accent:#0b74de;--muted:#6b7280;--danger:#ef4444}
+  html,body{height:100%;margin:0;font-family:Inter,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:#111}
+  .app{max-width:1200px;margin:18px auto;padding:16px;background:linear-gradient(180deg,#fff,#fbfdff);box-shadow:0 8px 30px rgba(15,23,42,0.06);border-radius:12px;display:grid;grid-template-columns:320px 1fr;gap:16px}
+  .panel{background:var(--panel);padding:12px;border-radius:10px;box-shadow:inset 0 1px 0 rgba(0,0,0,0.02)}
+  .toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  button, select, input[type=range], input[type=color]{font-size:14px}
+  button{background:#fff;border:1px solid #e6e9ee;padding:8px 10px;border-radius:8px;cursor:pointer}
+  button.active{border-color:var(--accent);box-shadow:0 6px 14px rgba(11,116,222,0.12)}
+  .colors{display:flex;gap:8px;flex-wrap:wrap}
+  .color-swatch{width:28px;height:28px;border-radius:6px;cursor:pointer;border:2px solid rgba(0,0,0,0.06)}
+  .tools-row{display:flex;gap:8px;margin-bottom:8px;align-items:center}
+  .canvas-wrap{position:relative;border-radius:10px;overflow:hidden;background:linear-gradient(45deg,#fff,#f7fbff);display:flex;flex-direction:column}
+  canvas{background:white;touch-action:none;display:block;width:100%;height:100%}
+  .controls{display:flex;align-items:center;gap:10px;margin-top:8px}
+  .saves{margin-top:12px;display:flex;flex-direction:column;gap:8px;max-height:420px;overflow:auto;padding-right:6px}
+  .save-item{display:flex;align-items:center;gap:8px;background:#fbfdff;border-radius:8px;padding:6px;border:1px solid #eef3ff}
+  .save-thumb{width:72px;height:50px;border-radius:6px;object-fit:cover;background:#fff;border:1px solid #e6eefc}
+  .save-meta{flex:1;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .small{font-size:13px;color:var(--muted)}
+  .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  .right-actions{display:flex;gap:8px;align-items:center}
+  .title{font-weight:600}
+  .danger{background:linear-gradient(180deg,#fff 0,#fff);border-color:var(--danger);color:var(--danger)}
+  .row{display:flex;gap:8px;align-items:center}
+  footer{grid-column:1/-1;margin-top:10px;text-align:center;color:var(--muted);font-size:13px}
+  @media (max-width:900px){.app{grid-template-columns:1fr;max-width:920px}}
+</style>
+</head>
+<body>
+<div class="app" role="application" aria-label="Drawing app">
+  <div class="panel" aria-hidden="false">
+    <div class="topbar">
+      <div>
+        <div class="title">Canvas Rival — Textures</div>
+        <div class="small">Sandpaper and Watercolor brushes; saves stored in browser</div>
+      </div>
+      <div class="right-actions">
+        <button id="downloadBtn" title="Download PNG">Download</button>
+        <button id="clearBtn" title="Clear canvas">Clear</button>
+      </div>
+    </div>
+
+    <div class="tools-row">
+      <div class="toolbar" role="toolbar" aria-label="tools">
+        <button id="pencilBtn" class="active" title="Pencil">Pencil</button>
+        <button id="fillBtn" title="Fill bucket">Fill</button>
+        <button id="eraseBtn" title="Eraser">Eraser</button>
+        <button id="saveBtn" title="Save to localStorage" style="background:linear-gradient(180deg,#eaf4ff,#dff0ff);border-color:#cbe7ff">Save</button>
+      </div>
+    </div>
+
+    <div style="margin-top:8px">
+      <label class="small">Brush size</label>
+      <div class="controls">
+        <input id="sizeRange" type="range" min="1" max="160" value="8" />
+        <div id="sizeIndicator" class="small">8 px</div>
+      </div>
+    </div>
+
+    <div style="margin-top:10px">
+      <label class="small">Colors</label>
+      <div class="colors" id="presetColors" style="margin-top:8px"></div>
+      <div style="margin-top:8px" class="row">
+        <input id="colorPicker" type="color" value="#111111" title="Choose color" />
+        <input id="altOpacity" type="range" min="0" max="1" step="0.01" value="1" title="Opacity" />
+        <div class="small" id="opacityLabel">Opacity: 100%</div>
+      </div>
+    </div>
+
+    <div style="margin-top:12px">
+      <label class="small">Texture</label>
+      <div style="margin-top:8px" class="row">
+        <select id="textureSelect" aria-label="Select texture">
+          <option value="none">None</option>
+          <option value="sandpaper">Sandpaper</option>
+          <option value="watercolor">Watercolor</option>
+        </select>
+        <div class="small" id="textureInfo">None</div>
+      </div>
+    </div>
+
+    <div style="margin-top:12px">
+      <label class="small">Saves</label>
+      <div class="saves" id="savesList" aria-live="polite"></div>
+    </div>
+  </div>
+
+  <div class="canvas-wrap panel" style="padding:12px">
+    <div style="display:flex;gap:12px;align-items:center;margin-bottom:8px">
+      <div class="small">Canvas</div>
+      <div class="small" id="canvasSizeLabel">1600 × 840</div>
+    </div>
+    <div style="flex:1; min-height:420px;">
+      <canvas id="canvas" width="1600" height="840" aria-label="Drawing canvas"></canvas>
+    </div>
+  </div>
+</div>
+
+<footer>
+  Textures are applied during strokes. Saves persist in localStorage under key canvas-rival-saves-v2.
+</footer>
+
+<script>
+/* ===== App variables ===== */
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d', { willReadFrequently: true });
+const pencilBtn = document.getElementById('pencilBtn');
+const fillBtn = document.getElementById('fillBtn');
+const eraseBtn = document.getElementById('eraseBtn');
+const saveBtn = document.getElementById('saveBtn');
+const clearBtn = document.getElementById('clearBtn');
+const downloadBtn = document.getElementById('downloadBtn');
+const sizeRange = document.getElementById('sizeRange');
+const sizeIndicator = document.getElementById('sizeIndicator');
+const colorPicker = document.getElementById('colorPicker');
+const altOpacity = document.getElementById('altOpacity');
+const opacityLabel = document.getElementById('opacityLabel');
+const presetColors = document.getElementById('presetColors');
+const savesList = document.getElementById('savesList');
+const canvasSizeLabel = document.getElementById('canvasSizeLabel');
+const textureSelect = document.getElementById('textureSelect');
+const textureInfo = document.getElementById('textureInfo');
+
+let drawing = false;
+let lastPos = {x:0,y:0};
+let tool = 'pencil'; // pencil | fill | erase
+let brushSize = parseInt(sizeRange.value,10);
+let color = colorPicker.value;
+let alpha = parseFloat(altOpacity.value);
+let eraserActive = false;
+let texture = 'none';
+
+/* ===== Initialize canvas backing and white background ===== */
+function initCanvas() {
+  canvas.width = 1600;
+  canvas.height = 840;
+  canvasSizeLabel.textContent = canvas.width + ' × ' + canvas.height;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+}
+initCanvas();
+
+/* ===== Preset colors ===== */
+const preset = ['#000000','#ffffff','#ff3b30','#ff9500','#ffd60a','#32d74b','#0a84ff','#5856d6','#ff2d55','#8e8e93'];
+preset.forEach(c=>{
+  const s = document.createElement('div');
+  s.className = 'color-swatch';
+  s.style.background = c;
+  s.title = c;
+  s.addEventListener('click', ()=> {
+    color = c;
+    colorPicker.value = c;
+    updateActiveUI();
+  });
+  presetColors.appendChild(s);
+});
+
+/* ===== UI updates ===== */
+function updateActiveUI(){
+  pencilBtn.classList.toggle('active', tool === 'pencil' && !eraserActive);
+  fillBtn.classList.toggle('active', tool === 'fill');
+  eraseBtn.classList.toggle('active', eraserActive);
+  sizeIndicator.textContent = brushSize + ' px';
+  opacityLabel.textContent = 'Opacity: ' + Math.round(alpha*100) + '%';
+  textureInfo.textContent = texture.charAt(0).toUpperCase() + texture.slice(1);
+}
+updateActiveUI();
+
+/* ===== Tool buttons ===== */
+pencilBtn.addEventListener('click', ()=>{ tool='pencil'; eraserActive=false; updateActiveUI(); });
+fillBtn.addEventListener('click', ()=>{ tool='fill'; eraserActive=false; updateActiveUI(); });
+eraseBtn.addEventListener('click', ()=>{
+  // Click once to enable eraser; click again to return to color mode
+  eraserActive = !eraserActive;
+  tool = eraserActive ? 'erase' : 'pencil';
+  updateActiveUI();
+});
+sizeRange.addEventListener('input', ()=>{ brushSize = parseInt(sizeRange.value,10); updateActiveUI(); });
+colorPicker.addEventListener('input', ()=>{ color = colorPicker.value; updateActiveUI(); });
+altOpacity.addEventListener('input', ()=>{ alpha = parseFloat(altOpacity.value); updateActiveUI(); });
+textureSelect.addEventListener('change', ()=>{ texture = textureSelect.value; updateActiveUI(); });
+
+clearBtn.addEventListener('click', ()=>{
+  ctx.save();
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  ctx.restore();
+});
+
+/* ===== Pointer helpers ===== */
+function getPosFromEvent(e){
+  const rect = canvas.getBoundingClientRect();
+  let clientX, clientY;
+  if (e.touches && e.touches.length) { clientX = e.touches[0].clientX; clientY = e.touches[0].clientY; }
+  else { clientX = e.clientX; clientY = e.clientY; }
+  return {
+    x: Math.round((clientX - rect.left) * (canvas.width / rect.width)),
+    y: Math.round((clientY - rect.top) * (canvas.height / rect.height))
+  };
+}
+
+/* ===== Drawing with textures ===== */
+function beginStroke(pos){
+  drawing = true;
+  lastPos = pos;
+  // set base stroke attributes
+  ctx.beginPath();
+  ctx.moveTo(pos.x + 0.5, pos.y + 0.5);
+}
+function moveStroke(pos){
+  if (!drawing) return;
+  const dist = Math.hypot(pos.x - lastPos.x, pos.y - lastPos.y);
+  // number of steps for smooth textured application
+  const steps = Math.max(1, Math.floor(dist / Math.max(1, brushSize / 6)));
+  for (let i = 0; i <= steps; i++){
+    const t = i/steps;
+    const x = Math.round(lastPos.x + (pos.x - lastPos.x) * t);
+    const y = Math.round(lastPos.y + (pos.y - lastPos.y) * t);
+    applyStamp(x,y);
+  }
+  lastPos = pos;
+}
+function endStroke(){
+  if (!drawing) return;
+  drawing = false;
+  ctx.closePath();
+}
+
+/* applyStamp draws a single brush application at an x,y according to current tool/texture */
+function applyStamp(x,y){
+  if (tool === 'fill') return;
+  if (eraserActive){
+    // eraser: clear a circle
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.beginPath();
+    ctx.arc(x,y, Math.max(1, brushSize/2), 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
+
+  if (texture === 'none'){
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.fillStyle = hexToRgba(color, alpha);
+    ctx.beginPath();
+    ctx.arc(x,y, Math.max(1, brushSize/2), 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
+
+  if (texture === 'sandpaper'){
+    // sandpaper: many tiny noisy dots with slight alpha; emulate grit
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    const baseA = alpha * 0.95;
+    const grit = Math.max(8, Math.floor(brushSize * 0.45)); // number of dots per stamp for larger brushes
+    for (let i=0;i<grit;i++){
+      const angle = Math.random() * Math.PI * 2;
+      const radius = Math.random() * brushSize * 0.55;
+      const rx = x + Math.cos(angle) * radius;
+      const ry = y + Math.sin(angle) * radius;
+      const size = Math.max(0.5, (Math.random() * 0.6 + 0.2) * (brushSize/8));
+      ctx.fillStyle = hexToRgba(color, baseA * (0.4 + Math.random()*0.8));
+      ctx.beginPath();
+      ctx.arc(rx, ry, size, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+    return;
+  }
+
+  if (texture === 'watercolor'){
+    // watercolor: layered soft strokes, lighten blending, and small blur applied via temporary canvas
+    // draw onto an offscreen canvas for blur and diffusion
+    const off = document.createElement('canvas');
+    off.width = Math.ceil(brushSize*3);
+    off.height = Math.ceil(brushSize*3);
+    const octx = off.getContext('2d');
+    // center point in offscreen
+    const cx = off.width/2, cy = off.height/2;
+    // multiple translucent ellipses produce watercolor bleed
+    octx.clearRect(0,0,off.width,off.height);
+    for (let i=0;i<6;i++){
+      const s = (0.6 + Math.random()*0.8) * (brushSize/2);
+      const rx = cx + (Math.random()-0.5) * brushSize*0.4;
+      const ry = cy + (Math.random()-0.5) * brushSize*0.4;
+      octx.beginPath();
+      octx.fillStyle = hexToRgba(color, alpha * (0.12 + Math.random()*0.18));
+      octx.ellipse(rx, ry, s, s * (0.6 + Math.random()*0.6), Math.random()*Math.PI, 0, Math.PI*2);
+      octx.fill();
+    }
+    // apply light blur by drawing scaled-down then scaled-up (cheap blur)
+    const tmp = document.createElement('canvas');
+    tmp.width = Math.max(1, Math.floor(off.width / 3));
+    tmp.height = Math.max(1, Math.floor(off.height / 3));
+    const tctx = tmp.getContext('2d');
+    tctx.drawImage(off, 0, 0, tmp.width, tmp.height);
+    octx.clearRect(0,0,off.width,off.height);
+    octx.globalAlpha = 1.0;
+    octx.drawImage(tmp, 0, 0, tmp.width, tmp.height, 0, 0, off.width, off.height);
+    // place onto main canvas with lighten blend for wet look
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.drawImage(off, x - cx, y - cy);
+    ctx.restore();
+    return;
+  }
+}
+
+/* ===== Pointer events ===== */
+canvas.addEventListener('pointerdown', (e)=> {
+  canvas.setPointerCapture(e.pointerId);
+  const pos = getPosFromEvent(e);
+  if (tool === 'fill'){
+    const rgba = colorToRgba(color, alpha);
+    floodFill(canvas, pos.x, pos.y, rgba);
+  } else {
+    beginStroke(pos);
+    // immediate stamp at down
+    applyStamp(pos.x, pos.y);
+  }
+});
+canvas.addEventListener('pointermove', (e)=> {
+  const pos = getPosFromEvent(e);
+  if (drawing) moveStroke(pos);
+});
+canvas.addEventListener('pointerup', (e)=> { endStroke(); });
+canvas.addEventListener('pointercancel', ()=> endStroke());
+canvas.addEventListener('touchstart', (e)=>{ }, {passive:true});
+
+/* ===== Utilities: color conversions ===== */
+function hexToRgba(hex, a){
+  const h = hex.replace('#','');
+  const bigint = parseInt(h,16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r},${g},${b},${a})`;
+}
+function colorToRgba(hex, a){
+  const h = hex.replace('#','');
+  const bigint = parseInt(h,16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return {r,g,b,a: Math.round(a*255)};
+}
+
+/* ===== Flood fill (iterative scanline) ===== */
+function getPixelIndex(x,y,w){ return (y*w + x) * 4; }
+function colorsMatch(px, target){ return px[0] === target[0] && px[1] === target[1] && px[2] === target[2] && px[3] === target[3]; }
+function floodFill(canvasEl, startX, startY, fillRGBA){
+  const w = canvasEl.width, h = canvasEl.height;
+  const ctxLocal = canvasEl.getContext('2d');
+  let img = ctxLocal.getImageData(0,0,w,h);
+  const data = img.data;
+  const startIdx = getPixelIndex(startX, startY, w);
+  const target = [data[startIdx], data[startIdx+1], data[startIdx+2], data[startIdx+3]];
+  const replacement = [fillRGBA.r, fillRGBA.g, fillRGBA.b, fillRGBA.a];
+  if (target[0] === replacement[0] && target[1] === replacement[1] && target[2] === replacement[2] && target[3] === replacement[3]) return;
+  const stack = [[startX, startY]];
+  while(stack.length){
+    const [sx,sy] = stack.pop();
+    let x = sx, y = sy;
+    let idx = getPixelIndex(x,y,w);
+    while(y >= 0 && colorsMatch([data[idx],data[idx+1],data[idx+2],data[idx+3]], target)){ y--; idx -= w*4; if (y < 0) break; }
+    y++; idx += w*4;
+    let reachLeft = false, reachRight = false;
+    while(y < h && colorsMatch([data[idx],data[idx+1],data[idx+2],data[idx+3]], target)){
+      data[idx] = replacement[0]; data[idx+1] = replacement[1]; data[idx+2] = replacement[2]; data[idx+3] = replacement[3];
+      if (x > 0){
+        if (colorsMatch([data[idx-4],data[idx-3],data[idx-2],data[idx-1]], target)){
+          if (!reachLeft){ stack.push([x-1,y]); reachLeft = true; }
+        } else reachLeft = false;
+      }
+      if (x < w-1){
+        if (colorsMatch([data[idx+4],data[idx+5],data[idx+6],data[idx+7]], target)){
+          if (!reachRight){ stack.push([x+1,y]); reachRight = true; }
+        } else reachRight = false;
+      }
+      y++; idx += w*4;
+    }
+  }
+  ctxLocal.putImageData(img,0,0);
+}
+
+/* ===== Save / localStorage gallery ===== */
+const STORAGE_KEY = 'canvas-rival-saves-v2';
+function saveCurrent(){
+  const dataUrl = canvas.toDataURL('image/png');
+  const saves = loadSaves();
+  const id = 's-' + Date.now();
+  saves.unshift({id, dataUrl, created: new Date().toISOString()});
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(saves.slice(0,50)));
+  renderSaves();
+}
+function loadSaves(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw);
+  } catch(e){ return []; }
+}
+function renderSaves(){
+  savesList.innerHTML = '';
+  const saves = loadSaves();
+  if (!saves.length){
+    const empty = document.createElement('div');
+    empty.className = 'small';
+    empty.textContent = 'No saves yet. Click Save to store your drawing in the browser.';
+    savesList.appendChild(empty);
+    return;
+  }
+  saves.forEach(s=>{
+    const item = document.createElement('div');
+    item.className = 'save-item';
+    const img = document.createElement('img');
+    img.className = 'save-thumb';
+    img.src = s.dataUrl;
+    img.alt = 'save thumbnail';
+    img.addEventListener('click', ()=> {
+      if (!confirm('Replace canvas with this saved image?')) return;
+      const image = new Image();
+      image.onload = ()=> {
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0,0,canvas.width,canvas.height);
+        ctx.drawImage(image,0,0,canvas.width,canvas.height);
+        ctx.restore();
+      };
+      image.src = s.dataUrl;
+    });
+    const meta = document.createElement('div');
+    meta.className = 'save-meta';
+    const left = document.createElement('div');
+    left.innerHTML = '<div style="font-weight:600">'+ (new Date(s.created)).toLocaleString() +'</div><div class="small">Saved in browser</div>';
+    const right = document.createElement('div');
+    right.style.display = 'flex';
+    right.style.gap = '6px';
+    const openBtn = document.createElement('button');
+    openBtn.innerText = 'Open';
+    openBtn.addEventListener('click', ()=> {
+      const w = window.open();
+      w.document.write('<img src="'+s.dataUrl+'" style="max-width:100%;height:auto;display:block;margin:0"/>');
+    });
+    const remove = document.createElement('button');
+    remove.innerText = 'X';
+    remove.className = 'danger';
+    remove.title = 'Delete save';
+    remove.addEventListener('click', ()=> {
+      if (!confirm('Delete this save?')) return;
+      const arr = loadSaves().filter(x=>x.id !== s.id);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(arr));
+      renderSaves();
+    });
+    right.appendChild(openBtn);
+    right.appendChild(remove);
+    meta.appendChild(left);
+    meta.appendChild(right);
+    item.appendChild(img);
+    item.appendChild(meta);
+    savesList.appendChild(item);
+  });
+}
+saveBtn.addEventListener('click', saveCurrent);
+renderSaves();
+
+/* ===== Download button ===== */
+downloadBtn.addEventListener('click', ()=>{
+  const dataUrl = canvas.toDataURL('image/png');
+  const a = document.createElement('a');
+  a.href = dataUrl;
+  a.download = 'drawing.png';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+});
+
+/* ===== Keyboard shortcuts ===== */
+window.addEventListener('keydown', (e)=>{
+  if (e.key === 'b') { tool='pencil'; eraserActive=false; updateActiveUI(); }
+  if (e.key === 'e') { eraserActive = !eraserActive; tool = eraserActive ? 'erase' : 'pencil'; updateActiveUI(); }
+  if (e.key === 'f') { tool='fill'; eraserActive=false; updateActiveUI(); }
+  if (e.key === 's' && (e.ctrlKey || e.metaKey)){ e.preventDefault(); saveCurrent(); }
+});
+
+/* ===== Notes =====
+ - Sandpaper: noisy dot clusters per stamp for a gritty look.
+ - Watercolor: layered soft ellipses blended with 'lighter' composite to simulate wet pigments and subtle bleed.
+ - Canvas backing set to 1600x840 for more room to paint.
+*/
+</script>
+</body>
+</html>
